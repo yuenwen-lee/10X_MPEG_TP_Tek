@@ -1,0 +1,106 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+#include "tp_head_tools.h"
+#include "tp_tek_t_stamp.h"
+
+
+
+// *****************************************************************************                                      
+// *****************************************************************************                                      
+// *****************************************************************************                                      
+
+int read_ts_file(char *path, char **buff_p, uint32_t *size_p)
+{
+    struct stat  f_stat;
+    FILE   *fp;
+    int     tp_numb;
+    int     video_size;
+    char   *video_data;
+
+    printf("video file path: %s\n", path);
+    if (stat(path, &f_stat) < 0) {
+        return -1;
+    }
+    printf("Video file size: %u byte\n", (uint32_t) f_stat.st_size);
+
+    video_data = (char *) malloc(f_stat.st_size);
+
+    tp_numb    = f_stat.st_size / TP_SIZE_BYTE;
+    video_size = tp_numb * TP_SIZE_BYTE;
+    if (video_size != f_stat.st_size) {
+        printf("WARNING, fragment TP in file\n");
+    }
+
+    fp = fopen(path, "r");
+    if (fp != NULL) {
+        video_size = fread(video_data, sizeof(char), video_size, fp);
+        fclose(fp);
+    } else {
+        printf("Can not open file %s to read\n", path);
+    }
+
+    *buff_p = video_data;
+    *size_p = video_size;
+
+    return 0;
+}
+
+
+
+// *****************************************************************************
+// *****************************************************************************
+// *****************************************************************************
+
+int read_tek_ts_file(char *path, char **buff_p, uint32_t *size_p, char **t_stamp_p)
+{
+    struct stat  f_stat;
+    FILE   *fp;
+    int     tp_numb;
+    int     video_size, t_stamp_size;
+    char   *video_data;
+    char   *t_stamp_data;
+    int     n;
+
+    printf("video file path: %s\n", path);
+    if (stat(path, &f_stat) < 0) {
+        return -1;
+    }
+    printf("Video file size: %u byte\n", (uint32_t) f_stat.st_size);
+    printf("\n");
+
+    tp_numb      = f_stat.st_size / (TP_SIZE_BYTE + TEK_T_STAMP_SIZE);
+    video_size   = tp_numb * TP_SIZE_BYTE;
+    t_stamp_size = tp_numb * TEK_T_STAMP_SIZE;
+    if ((video_size + t_stamp_size) != f_stat.st_size) {
+        printf("WARNING, fragment TP in file\n");
+    }
+
+    video_data   = (char *) malloc(video_size);
+    t_stamp_data = (char *) malloc(t_stamp_size);
+
+    fp = fopen(path, "r");
+    if (fp == NULL) {
+        printf("Can not open file %s to read\n", path);
+        exit(1);
+    }
+
+    for (n = 0; n < tp_numb; ++n) {
+        // read 188 Byte MPEG TP
+        fread((video_data + (n * TP_SIZE_BYTE)), sizeof(char), TP_SIZE_BYTE, fp);
+        // read 188 Byte MPEG TP
+        fread((t_stamp_data + (n * TEK_T_STAMP_SIZE)), sizeof(char), TEK_T_STAMP_SIZE, fp);
+    }
+
+    fclose(fp);
+
+    *buff_p    = video_data;
+    *size_p    = video_size;
+    *t_stamp_p = t_stamp_data;
+
+    return 0;
+}
